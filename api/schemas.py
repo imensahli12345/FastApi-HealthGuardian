@@ -20,36 +20,7 @@ class EquipmentType(str, Enum):
     outdoor = "outdoor"
     none = "none"
 
-# 📊 Base User Health Data
-class UserHealthData(BaseModel):
-    userId: int = Field(..., description="User ID from Spring Boot")
-    age: int = Field(..., ge=10, le=120, description="Age in years")
-    weight: float = Field(..., gt=0, description="Weight in kg")
-    height: float = Field(..., gt=0, description="Height in meters")
-    medical_history: Optional[str] = Field(None, description="Existing conditions")
-    blood_pressure: Optional[int] = Field(None, description="Systolic BP")
-    
-    class Config:
-        schema_extra = {
-            "example": {
-                "userId": 123,
-                "age": 35,
-                "weight": 75.5,
-                "height": 1.75,
-                "medical_history": "Diabète type 2",
-                "blood_pressure": 130
-            }
-        }
 
-# 🔮 Risk Prediction Response
-class RiskPredictionResponse(BaseModel):
-    userId: int
-    bmi: float
-    health_score: float = Field(..., ge=0, le=100, description="Overall health score")
-    risk_diabetes: float = Field(..., ge=0, le=1, description="Diabetes risk 0-1")
-    risk_hypertension: float = Field(..., ge=0, le=1, description="Hypertension risk 0-1")
-    risk_obesity: float = Field(..., ge=0, le=1, description="Obesity risk 0-1")
-    recommendations: List[str]
     
 # 🍽️ Nutrition Request
 class NutritionRequest(BaseModel):
@@ -143,3 +114,46 @@ class ExerciseResponse(BaseModel):
     total_weekly_calories: int
     progression_notes: str
     tips: List[str]
+
+
+# 1. INPUT DATA (What the Frontend sends)
+class UserHealthData(BaseModel):
+    userId: int
+    age: int
+    gender: int = Field(..., description="0=Male, 1=Female")
+    height: float = Field(..., description="Height in meters (e.g. 1.75)")
+    weight: float = Field(..., description="Weight in kg")
+    
+    # Lifestyle Data
+    hours_of_sleep: float
+    exercise_hours_per_week: float
+    daily_steps: int
+    water_liters: float = Field(..., alias="litres_eau_jour") # Alias handles mapping
+    coffee_cups: int = Field(..., alias="cafe_jour")
+    work_hours: float = Field(..., alias="heures_travail_jour")
+    bedtime_hour: str = Field(..., description="Format HH:MM (e.g. '23:30')")
+    
+    # Medical Data
+    bp_systolic: int
+    bp_diastolic: int
+    
+    # Text Categories (We will convert these to numbers)
+    job_type: str = Field(..., description="IT/Tech, Santé, Bureau, Commerce, Industrie, Enseignement")
+    activity_status: str = Field(..., description="Working, Student, Inactive")
+
+# 🚨 UPDATED: Includes specific risks and diet plans
+class RiskPredictionResponse(BaseModel):
+    userId: int
+    bmi: float
+    health_score: float
+    
+    # Probabilities
+    risk_diabetes: float
+    risk_hypertension: float
+    risk_obesity: float
+    risk_heart_disease: float
+    
+    # Advice
+    recommendations: List[str]
+    needs_doctor: bool
+    diet_plan_type: str # "balanced", "low_sugar", "low_salt"

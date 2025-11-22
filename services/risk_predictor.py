@@ -1,228 +1,131 @@
+import joblib
+import pandas as pd
+import numpy as np
+import os
 from api.schemas import UserHealthData, RiskPredictionResponse
-from utils.data_fetcher import HealthCalculators
-from typing import List
+
+# 1. Load Model & Features
+current_dir = os.path.dirname(os.path.abspath(__file__))
+MODEL_PATH = os.path.join(current_dir, "..", "models", "health_risk_model.joblib")
+FEATURES_PATH = os.path.join(current_dir, "..", "models", "model_features.joblib")
+
+try:
+    model = joblib.load(MODEL_PATH)
+    model_features = joblib.load(FEATURES_PATH)
+    print("✅ AI Brain Loaded Successfully")
+except Exception as e:
+    print(f"❌ Error loading AI model: {e}")
+    model = None
+    model_features = []
 
 def predict_health_risks(data: UserHealthData) -> RiskPredictionResponse:
-    """
-    Predict health risks based on user data
+    if not model:
+        raise RuntimeError("AI Model is not loaded. Check server logs.")
+
+    # 2. Calculate BMI
+    bmi = round(data.weight / (data.height ** 2), 2)
+
+    # 3. Convert Bedtime (HH:MM) to numeric (e.g. 23:30 -> 23.5)
+    try:
+        h, m = map(int, data.bedtime_hour.split(':'))
+        bedtime_num = h + (m / 60)
+    except:
+        bedtime_num = 23.0 # Default if error
+
+    # 4. Prepare Input DataFrame (Initialize with 0s)
+    # We create a single row dataframe with columns matching the training data
+
+    #create empty data frame with columns matching the training data , empty data frame with columns matching the training data
+    #What it does: Creates a single-row dataframe filled with zeros, with columns matching those from training:
+
+#All columns are initialized to 0
+#Will be filled with actual user data next
+#Ensures the model receives data in the exact format it expects
+    input_df = pd.DataFrame(0, index=[0], columns=model_features)
+
+    # 5. Fill Numeric Data
+    # Map Schema fields to Model Columns
+    input_df['Age'] = data.age
+    input_df['Gender'] = data.gender
+    input_df['BMI'] = bmi
+    input_df['Hours_of_Sleep'] = data.hours_of_sleep
+    input_df['Exercise_Hours_per_Week'] = data.exercise_hours_per_week
+    input_df['Daily_Steps'] = data.daily_steps
+    input_df['litres_eau_jour'] = data.water_liters
+    input_df['cafe_jour'] = data.coffee_cups
+    input_df['heures_travail_jour'] = data.work_hours
+    input_df['BP_Systolic'] = data.bp_systolic
+    input_df['BP_Diastolic'] = data.bp_diastolic
+    input_df['heure_coucher_num'] = bedtime_num
+
+    # 6. Fill Categorical Data (One-Hot Encoding)
+    # Example: If job is 'Bureau', we set column 'metier_Bureau' to 1
+    #One-Hot Encoding Rule: Only the user's actual category gets a 1, everything else is 0
+#   Mutually Exclusive: A person can only have ONE job type at a time (they can't be both IT/Tech AND Bureau)
+#   The Model Understands: When the model sees [0, 0, 1, 0, 0, 0, ...], it knows "this person is Bureau"
+    job_col = f"metier_{data.job_type}"
+    if job_col in input_df.columns:
+        input_df[job_col] = 1
+        
+    status_col = f"statut_activite_{data.activity_status}"
+    if status_col in input_df.columns:
+        input_df[status_col] = 1
+
+    # 7. Predict!
+    # probas is a list of arrays (one per disease)
+    #geting the probabilty from the model for each disease
+    probas = model.predict_proba(input_df)
     
-    NOTE: This is a PLACEHOLDER using rule-based logic.
-    In Week 2-3, you'll train an actual ML model (Random Forest/XGBoost)
-    and load it here using joblib.
+    # Extract probabilities (Class 1 = 'Yes')
+    risk_diabetes = float(probas[0][0][1])
+    risk_hypertension = float(probas[1][0][1])
+    risk_obesity = float(probas[2][0][1])
+    risk_heart = float(probas[3][0][1])
+
+    # 8. Generate Logic-Based Advice
+
+    #generating helath advice we should do that with LLM and api externe instead of hardcoded logic
+    recommendations = []
+    needs_doctor = False
+    diet_plan = "balanced"
+
+    # Alert Logic
+    if risk_diabetes > 0.6:
+        recommendations.append("🚨 Risque Diabète élevé : Consultez un médecin rapidement.")
+        needs_doctor = True
+        diet_plan = "low_sugar"
     
-    For now, we use BMI and age-based risk assessment.
-    """
+    if risk_hypertension > 0.6:
+        recommendations.append("❤️ Attention à votre tension : Réduisez le sel.")
+        diet_plan = "low_salt" if diet_plan != "low_sugar" else "complex"
+
+    if risk_obesity > 0.5:
+        recommendations.append("⚖️ Objectif poids : Un déficit calorique est recommandé.")
+        
+    # Hygiene Logic
+    if data.daily_steps < 4000:
+        recommendations.append("🚶 Vous êtes sédentaire. Essayez de marcher 30min par jour.")
     
-    # Calculate BMI
-    bmi = HealthCalculators.calculate_bmi(data.weight, data.height)
-    bmi_category = HealthCalculators.get_bmi_category(bmi)
-    
-    # Rule-based risk assessment (temporary, will be replaced with ML model)
-    risk_diabetes = calculate_diabetes_risk(data, bmi)
-    risk_hypertension = calculate_hypertension_risk(data, bmi)
-    risk_obesity = 0.0 if bmi < 30 else min((bmi - 30) / 10, 1.0)
-    
-    # Calculate overall health score (0-100)
-    health_score = calculate_health_score(bmi, data.age, risk_diabetes, risk_hypertension)
-    
-    # Generate recommendations
-    recommendations = generate_recommendations(
-        bmi_category,
-        risk_diabetes,
-        risk_hypertension,
-        data.medical_history
-    )
-    
+    if data.water_liters < 1.5:
+        recommendations.append("💧 Hydratez-vous plus (minimum 1.5L/jour).")
+
+    # Default message if healthy
+    if not recommendations:
+        recommendations.append("✅ Excellent ! Continuez vos bonnes habitudes.")
+
+    # Calculate Score (100 - average risk)
+    avg_risk = (risk_diabetes + risk_hypertension + risk_obesity + risk_heart) / 4
+    health_score = round(100 - (avg_risk * 100), 1)
+
     return RiskPredictionResponse(
         userId=data.userId,
         bmi=bmi,
         health_score=health_score,
-        risk_diabetes=risk_diabetes,
-        risk_hypertension=risk_hypertension,
-        risk_obesity=risk_obesity,
-        recommendations=recommendations
+        risk_diabetes=round(risk_diabetes, 2),
+        risk_hypertension=round(risk_hypertension, 2),
+        risk_obesity=round(risk_obesity, 2),
+        risk_heart_disease=round(risk_heart, 2),
+        recommendations=recommendations,
+        needs_doctor=needs_doctor,
+        diet_plan_type=diet_plan
     )
-
-
-def calculate_diabetes_risk(data: UserHealthData, bmi: float) -> float:
-    """
-    Calculate diabetes risk (0-1 scale)
-    
-    Risk factors:
-    - BMI > 25 (overweight)
-    - Age > 45
-    - Family history (in medical_history)
-    - High blood pressure
-    """
-    risk = 0.0
-    
-    # BMI factor (40% of risk)
-    if bmi >= 30:  # Obese
-        risk += 0.4
-    elif bmi >= 25:  # Overweight
-        risk += 0.2
-    
-    # Age factor (30% of risk)
-    if data.age >= 60:
-        risk += 0.3
-    elif data.age >= 45:
-        risk += 0.15
-    
-    # Blood pressure factor (20% of risk)
-    if data.blood_pressure and data.blood_pressure >= 140:
-        risk += 0.2
-    elif data.blood_pressure and data.blood_pressure >= 130:
-        risk += 0.1
-    
-    # Medical history factor (10% of risk)
-    if data.medical_history:
-        history_lower = data.medical_history.lower()
-        if "diabète" in history_lower or "diabetes" in history_lower:
-            risk = 0.9  # Already has diabetes
-        elif "prédiabète" in history_lower:
-            risk += 0.1
-    
-    return min(risk, 1.0)  # Cap at 1.0
-
-
-def calculate_hypertension_risk(data: UserHealthData, bmi: float) -> float:
-    """
-    Calculate hypertension (high blood pressure) risk (0-1 scale)
-    
-    Risk factors:
-    - High BMI
-    - Age > 40
-    - Already high blood pressure readings
-    """
-    risk = 0.0
-    
-    # BMI factor (30% of risk)
-    if bmi >= 30:
-        risk += 0.3
-    elif bmi >= 25:
-        risk += 0.15
-    
-    # Age factor (30% of risk)
-    if data.age >= 60:
-        risk += 0.3
-    elif data.age >= 40:
-        risk += 0.15
-    
-    # Blood pressure reading (40% of risk)
-    if data.blood_pressure:
-        if data.blood_pressure >= 180:  # Stage 2 hypertension
-            risk = 1.0
-        elif data.blood_pressure >= 140:  # Stage 1 hypertension
-            risk += 0.4
-        elif data.blood_pressure >= 130:  # Elevated
-            risk += 0.2
-    else:
-        risk += 0.1  # Unknown BP is a minor risk
-    
-    # Medical history
-    if data.medical_history:
-        history_lower = data.medical_history.lower()
-        if "hypertension" in history_lower:
-            risk = 0.95  # Already has hypertension
-    
-    return min(risk, 1.0)
-
-
-def calculate_health_score(
-    bmi: float,
-    age: int,
-    risk_diabetes: float,
-    risk_hypertension: float
-) -> float:
-    """
-    Calculate overall health score (0-100)
-    
-    100 = Excellent health
-    80-99 = Good health
-    60-79 = Fair health
-    40-59 = Poor health
-    0-39 = High risk
-    """
-    score = 100.0
-    
-    # Deduct points for BMI
-    if bmi < 18.5:  # Underweight
-        score -= 20
-    elif bmi >= 30:  # Obese
-        score -= 30
-    elif bmi >= 25:  # Overweight
-        score -= 15
-    
-    # Deduct points for age (minor factor)
-    if age >= 60:
-        score -= 10
-    elif age >= 50:
-        score -= 5
-    
-    # Deduct points for disease risks
-    score -= risk_diabetes * 25  # Up to -25 points
-    score -= risk_hypertension * 25  # Up to -25 points
-    
-    return max(round(score, 1), 0.0)  # Never below 0
-
-
-def generate_recommendations(
-    bmi_category: str,
-    risk_diabetes: float,
-    risk_hypertension: float,
-    medical_history: str
-) -> List[str]:
-    """Generate personalized health recommendations"""
-    
-    recommendations = []
-    
-    # BMI-based recommendations
-    if bmi_category == "Obese":
-        recommendations.append("⚠️ Votre IMC indique une obésité. Consultez un médecin pour un plan de perte de poids adapté.")
-        recommendations.append("🏃 Commencez par 30 minutes de marche rapide par jour (Corniche La Marsa)")
-        recommendations.append("🍽️ Réduisez les portions et privilégiez les légumes")
-    elif bmi_category == "Overweight":
-        recommendations.append("📊 Votre IMC indique un surpoids léger. Un ajustement alimentaire peut aider.")
-        recommendations.append("🚶 Augmentez votre activité physique quotidienne")
-    elif bmi_category == "Underweight":
-        recommendations.append("⚠️ Votre IMC est bas. Consultez un nutritionniste pour augmenter sainement votre poids.")
-        recommendations.append("🍗 Augmentez votre apport en protéines et calories")
-    else:  # Normal
-        recommendations.append("✅ Votre IMC est dans la norme. Maintenez vos bonnes habitudes!")
-    
-    # Diabetes risk recommendations
-    if risk_diabetes >= 0.7:
-        recommendations.append("🚨 RISQUE ÉLEVÉ de diabète - Consultez immédiatement un médecin")
-        recommendations.append("🍬 Éliminez les boissons sucrées et pâtisseries")
-        recommendations.append("📊 Faites un dépistage de glycémie")
-    elif risk_diabetes >= 0.4:
-        recommendations.append("⚠️ Risque modéré de diabète - Surveillance recommandée")
-        recommendations.append("🥗 Réduisez les glucides raffinés (pain blanc, pâtes)")
-        recommendations.append("🏃 Pratiquez 150 min d'activité physique/semaine")
-    
-    # Hypertension risk recommendations
-    if risk_hypertension >= 0.7:
-        recommendations.append("🚨 RISQUE ÉLEVÉ d'hypertension - Consultez un cardiologue")
-        recommendations.append("🧂 Réduisez drastiquement votre consommation de sel")
-        recommendations.append("💊 Un traitement médical peut être nécessaire")
-    elif risk_hypertension >= 0.4:
-        recommendations.append("⚠️ Risque modéré d'hypertension - Surveillez votre tension")
-        recommendations.append("🧂 Limitez le sel et les aliments transformés")
-        recommendations.append("🧘 Pratiquez des exercices de relaxation (yoga, méditation)")
-    
-    # Medical history specific recommendations
-    if medical_history:
-        history_lower = medical_history.lower()
-        if "diabète" in history_lower or "diabetes" in history_lower:
-            recommendations.append("💉 Suivez rigoureusement votre traitement pour le diabète")
-            recommendations.append("📊 Contrôlez votre glycémie quotidiennement")
-        if "hypertension" in history_lower:
-            recommendations.append("💊 Prenez vos médicaments anti-hypertension régulièrement")
-            recommendations.append("📈 Mesurez votre tension artérielle chaque semaine")
-    
-    # General recommendations (always include)
-    recommendations.append("💧 Buvez au moins 2 litres d'eau par jour")
-    recommendations.append("😴 Dormez 7-8 heures par nuit")
-    recommendations.append("🏥 Faites un bilan de santé annuel")
-    
-    return recommendations[:8]  # Return max 8 recommendations

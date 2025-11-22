@@ -1,8 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-from typing import Optional, List
 import uvicorn
+from api.routes import router
 
 # Create FastAPI app
 app = FastAPI(
@@ -20,22 +19,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Pydantic models
-class HealthProfile(BaseModel):
-    age: int
-    weight: float
-    height: float
-    activity_level: str
-    health_goals: List[str]
-    dietary_restrictions: Optional[List[str]] = None
-
-class NutritionRecommendation(BaseModel):
-    meal_type: str
-    foods: List[str]
-    calories: float
-    protein: float
-    carbs: float
-    fats: float
+# Include API routes
+app.include_router(router, prefix="/api", tags=["api"])
 
 # Root endpoint
 @app.get("/")
@@ -46,8 +31,10 @@ async def root():
         "version": "1.0.0",
         "endpoints": [
             "/health",
+            "/api/predict-risks",
             "/api/nutrition/recommend",
-            "/api/exercise/recommend"
+            "/api/exercise/recommend",
+            "/api/chatbot"
         ]
     }
 
@@ -55,44 +42,6 @@ async def root():
 @app.get("/health")
 async def health_check():
     return {"status": "healthy", "service": "HealthGuardian AI"}
-
-# Nutrition recommendation endpoint
-@app.post("/api/nutrition/recommend")
-async def recommend_nutrition(profile: HealthProfile):
-    # Placeholder - we'll implement this with real data later
-    return {
-        "status": "success",
-        "message": "Nutrition recommendations generated",
-        "profile": profile.dict(),
-        "recommendations": [
-            {
-                "meal_type": "breakfast",
-                "foods": ["Whole grain bread", "Olive oil", "Tomatoes"],
-                "calories": 350,
-                "protein": 12,
-                "carbs": 45,
-                "fats": 15
-            }
-        ]
-    }
-
-# Exercise recommendation endpoint
-@app.post("/api/exercise/recommend")
-async def recommend_exercise(profile: HealthProfile):
-    # Placeholder - we'll implement this with real data later
-    return {
-        "status": "success",
-        "message": "Exercise recommendations generated",
-        "profile": profile.dict(),
-        "recommendations": [
-            {
-                "exercise": "Walking",
-                "duration_minutes": 30,
-                "intensity": "moderate",
-                "calories_burned": 150
-            }
-        ]
-    }
 
 if __name__ == "__main__":
     uvicorn.run("app:app", host="0.0.0.0", port=8000, reload=True)
