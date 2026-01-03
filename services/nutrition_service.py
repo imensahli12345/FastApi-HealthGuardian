@@ -3,7 +3,7 @@ from utils.data_fetcher import NutritionAPI, HealthCalculators
 from typing import List
 import random
 
-async def generate_nutrition_plan(request: NutritionRequest) -> NutritionResponse:
+async def generate_nutrition_plan(request: NutritionRequest,health_risks: dict = {}) -> NutritionResponse:
     """
     Generate a personalized nutrition plan using OpenFoodFacts API
     

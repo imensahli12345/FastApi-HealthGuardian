@@ -1,0 +1,144 @@
+{
+    "_comment": "Medical thresholds based on WHO/AHA 2017 clinical guidelines. Update this file when standards change.",
+    "_version": "1.0.0",
+    "_last_updated": "2025-12-30",
+    "bmi_thresholds": {
+        "_source": "WHO BMI Classification",
+        "severe_obesity": {
+            "min": 40.0,
+            "max": 999,
+            "risk_value": 0.99,
+            "classification": "Class III Severe Obesity",
+            "severity": "critical"
+        },
+        "moderate_obesity": {
+            "min": 35.0,
+            "max": 40.0,
+            "risk_value": 0.98,
+            "classification": "Class II Obesity",
+            "severity": "critical"
+        },
+        "obesity": {
+            "min": 30.0,
+            "max": 35.0,
+            "risk_value": 0.95,
+            "classification": "Class I Obesity",
+            "severity": "warning"
+        },
+        "overweight": {
+            "min": 25.0,
+            "max": 30.0,
+            "risk_value": 0.60,
+            "classification": "Overweight",
+            "severity": "warning"
+        },
+        "normal": {
+            "min": 18.5,
+            "max": 25.0,
+            "risk_value": null,
+            "classification": "Normal Weight",
+            "severity": "normal"
+        },
+        "underweight": {
+            "min": 0,
+            "max": 18.5,
+            "risk_value": 0.40,
+            "classification": "Underweight",
+            "severity": "warning"
+        }
+    },
+    "blood_pressure_thresholds": {
+        "_source": "AHA 2017 Blood Pressure Guidelines",
+        "hypertensive_crisis": {
+            "systolic_min": 180,
+            "diastolic_min": 120,
+            "risk_value": 0.99,
+            "classification": "Hypertensive Crisis",
+            "severity": "critical",
+            "operator": "OR"
+        },
+        "stage_2_hypertension": {
+            "systolic_min": 140,
+            "diastolic_min": 90,
+            "risk_value": 0.95,
+            "classification": "Stage 2 Hypertension",
+            "severity": "critical",
+            "operator": "OR"
+        },
+        "stage_1_hypertension": {
+            "systolic_min": 130,
+            "diastolic_min": 80,
+            "risk_value": 0.85,
+            "classification": "Stage 1 Hypertension",
+            "severity": "warning",
+            "operator": "OR"
+        },
+        "elevated": {
+            "systolic_min": 120,
+            "systolic_max": 130,
+            "diastolic_max": 80,
+            "risk_value": 0.50,
+            "classification": "Elevated Blood Pressure",
+            "severity": "warning",
+            "operator": "AND"
+        },
+        "normal": {
+            "systolic_max": 120,
+            "diastolic_max": 80,
+            "risk_value": null,
+            "classification": "Normal Blood Pressure",
+            "severity": "normal",
+            "operator": "AND"
+        }
+    },
+    "diabetes_risk_factors": {
+        "_comment": "Composite risk indicators for diabetes based on ADA guidelines",
+        "high_risk_combo": {
+            "conditions": {
+                "bmi_min": 35.0,
+                "activity_sedentary": true,
+                "sleep_hours_max": 6.0
+            },
+            "risk_value": 0.80,
+            "classification": "Multiple High-Risk Diabetes Indicators",
+            "severity": "critical"
+        },
+        "moderate_risk_combo": {
+            "conditions": {
+                "age_min": 45,
+                "bmi_min": 30.0
+            },
+            "risk_value": 0.70,
+            "classification": "Diabetes Risk Factors Present",
+            "severity": "warning"
+        }
+    },
+    "heart_disease_risk_factors": {
+        "_comment": "Composite cardiovascular risk indicators",
+        "high_risk_combo": {
+            "conditions": {
+                "has_hypertension": true,
+                "bmi_min": 30.0,
+                "exercise_hours_max": 1.0
+            },
+            "risk_value": 0.85,
+            "classification": "High Cardiovascular Risk",
+            "severity": "critical"
+        },
+        "moderate_risk_combo": {
+            "conditions": {
+                "age_min": 50,
+                "multiple_risk_factors": 2
+            },
+            "risk_value": 0.75,
+            "classification": "Elevated Cardiovascular Risk",
+            "severity": "warning"
+        }
+    },
+    "severity_colors": {
+        "_comment": "Color codes for frontend display",
+        "critical": "#DC2626",
+        "warning": "#F59E0B",
+        "normal": "#10B981"
+    }
+}

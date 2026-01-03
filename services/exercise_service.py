@@ -3,7 +3,7 @@ from utils.data_fetcher import ExerciseAPI, HealthCalculators
 from typing import List, Dict
 import random
 
-async def generate_exercise_plan(request: ExerciseRequest) -> ExerciseResponse:
+async def generate_exercise_plan(request: ExerciseRequest,health_risks: dict = {}) -> ExerciseResponse:
     """
     Generate a personalized exercise plan using wger.de API + custom Tunisian exercises
     

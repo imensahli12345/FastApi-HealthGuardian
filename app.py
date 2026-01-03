@@ -13,7 +13,7 @@ app = FastAPI(
 # Configure CORS (allow Spring Boot backend to call this API)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:8080"],  # Spring Boot default port
+    allow_origins=["*"],  # Allow all origins for development (React, Spring Boot, etc.)
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -31,6 +31,7 @@ async def root():
         "version": "1.0.0",
         "endpoints": [
             "/health",
+            "/api/generate-full-plan",  # <--- Added your main endpoint here
             "/api/predict-risks",
             "/api/nutrition/recommend",
             "/api/exercise/recommend",
