@@ -1,0 +1,19 @@
+image: docker:latest
+
+services:
+  - docker:dind
+
+stages:
+  - build-and-deploy
+
+deploy-to-dockerhub:
+  stage: build-and-deploy
+  script:
+    - echo "Connexion à Docker Hub..."
+    - docker login -u "$DOCKER_HUB_USER" -p "$DOCKER_HUB_PASSWORD"
+    - echo "Construction de l'image Docker..."
+    - docker build -t "$DOCKER_HUB_USER/healthguardian-ai:latest" .
+    - echo "Push de l'image vers Docker Hub..."
+    - docker push "$DOCKER_HUB_USER/healthguardian-ai:latest"
+  only:
+    - main
